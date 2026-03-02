@@ -15,6 +15,8 @@ import (
 	"github.com/aga-absolut/LoyaltyProgram/internal/storage/database"
 	"github.com/aga-absolut/LoyaltyProgram/internal/workers"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	
 )
 
 func main() {

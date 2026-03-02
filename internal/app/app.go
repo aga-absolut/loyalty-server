@@ -61,7 +61,7 @@ func (a *App) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	cookie := jwt.BuildCookie(token)
 	http.SetCookie(w, cookie)
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (a *App) AuthHandler(w http.ResponseWriter, r *http.Request) {
