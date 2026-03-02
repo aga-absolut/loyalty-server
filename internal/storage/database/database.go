@@ -17,8 +17,7 @@ import (
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
-	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/pressly/goose/v3"
+	"github.com/pressly/goose"
 )
 
 type Database struct {
@@ -195,9 +194,9 @@ func (d *Database) Withdrawals(ctx context.Context, userID int) ([]model.Withdra
 	return withdrawals, nil
 }
 
-func (d *Database) UpdateOrderStatus(ctx context.Context, orderID, status string, accrual int) error{
+func (d *Database) UpdateOrderStatus(ctx context.Context, orderID, status string, accrual int) error {
 	_, err := d.db.ExecContext(ctx, `UPDATE orders 
-	SET order_status = $1, accrual = $2 WHERE order_id = $3`, status,accrual, orderID)
+	SET order_status = $1, accrual = $2 WHERE order_id = $3`, status, accrual, orderID)
 	if err != nil {
 		return err
 	}
