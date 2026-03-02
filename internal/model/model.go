@@ -27,7 +27,7 @@ type WithdrawRequest struct {
 type WithdrawResponse struct {
 	Order        string    `json:"order"`
 	Sum          float64   `json:"sum"`
-	Processed_at time.Time `json:"processed_at"`
+	ProcessedAt time.Time `json:"processed_at"`
 }
 
 type Sum struct {

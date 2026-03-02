@@ -17,6 +17,7 @@ import (
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose"
 )
 
@@ -122,6 +123,10 @@ func (d *Database) GetListOrders(ctx context.Context, userID int) ([]model.ListO
 		}
 		orders = append(orders, order)
 	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return orders, nil
 }
 
@@ -186,10 +191,14 @@ func (d *Database) Withdrawals(ctx context.Context, userID int) ([]model.Withdra
 	withdrawals := make([]model.WithdrawResponse, 0)
 	for rows.Next() {
 		withdrawal := model.WithdrawResponse{}
-		if err := rows.Scan(&withdrawal.Order, &withdrawal.Sum, &withdrawal.Processed_at); err != nil {
+		if err := rows.Scan(&withdrawal.Order, &withdrawal.Sum, &withdrawal.ProcessedAt); err != nil {
 			return nil, err
 		}
 		withdrawals = append(withdrawals, withdrawal)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return withdrawals, nil
 }
