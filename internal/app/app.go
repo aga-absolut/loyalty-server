@@ -19,14 +19,16 @@ type App struct {
 	config  *config.Config
 	logger  *logger.Logger
 	storage repository.Storage
+	processChan chan string
 }
 
-func NewApp(config *config.Config, logger *logger.Logger, storage repository.Storage) *App {
-	return &App{
-		config:  config,
-		logger:  logger,
-		storage: storage,
-	}
+func NewApp(config *config.Config, logger *logger.Logger, storage repository.Storage, processChan chan string) *App {
+    return &App{
+        config:      config,
+        logger:      logger,
+        storage:     storage,
+        processChan: processChan,
+    }
 }
 
 func (a *App) RegisterHandler(w http.ResponseWriter, r *http.Request) {
@@ -122,6 +124,7 @@ func (a *App) AddOrderIDHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	a.processChan <- orderID
 	w.WriteHeader(http.StatusAccepted)
 }
 

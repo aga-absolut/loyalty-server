@@ -27,7 +27,7 @@ func main() {
 	logger := logger.NewLogger()
 	storage := storage.NewStorage(cfg, logger)
 	worker := workers.NewPollWorker(ctx, processChan, storage, config.SizeWorkers, logger, cfg)
-	app := app.NewApp(cfg, logger, storage)
+	app := app.NewApp(cfg, logger, storage, processChan)
 	router := router.NewRouter(app)
 	if err := database.InitMigrations(cfg, logger); err != nil {
 		logger.Fatalw("error to init migrations", "error", err)
