@@ -43,10 +43,7 @@ func (w *Worker) PollOrderStatus(ctx context.Context) {
 			if !ok {
 				return
 			}
-			err := w.Poll(ctx, order)
-			if err != nil {
-				return
-			}
+			go w.Poll(context.Background(), order)
 		}
 	}
 }
