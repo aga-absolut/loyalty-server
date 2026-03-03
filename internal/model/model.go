@@ -39,3 +39,8 @@ type AccrualResponse struct {
 	Status  string  `json:"status"`
 	Accrual float64 `json:"accrual,omitempty"`
 }
+
+type TypeForChannel struct {
+	OrderNum string
+	User     string
+}

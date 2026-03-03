@@ -13,22 +13,19 @@ import (
 	"github.com/aga-absolut/LoyaltyProgram/internal/repository"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/auth"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
-	"github.com/go-chi/chi"
 )
 
 type App struct {
-	processChan chan string
-	config      *config.Config
-	logger      *logger.Logger
-	storage     repository.Storage
+	config  *config.Config
+	logger  *logger.Logger
+	storage repository.Storage
 }
 
-func NewApp(config *config.Config, logger *logger.Logger, storage repository.Storage, processChan chan string) *App {
+func NewApp(config *config.Config, logger *logger.Logger, storage repository.Storage) *App {
 	return &App{
-		config:      config,
-		logger:      logger,
-		storage:     storage,
-		processChan: processChan,
+		config:  config,
+		logger:  logger,
+		storage: storage,
 	}
 }
 
@@ -256,23 +253,6 @@ func (a *App) AddAccrualHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-}
-
-func (a *App) PollAccrualSystem(w http.ResponseWriter, r *http.Request) {
-	orderNumber := chi.URLParam(r, "number")
-	if orderNumber == "" {
-		http.Error(w, "order number is required", http.StatusBadRequest)
-		return
-	}
-
-	if !isDigitsOnly(orderNumber) {
-		http.Error(w, "invalid order number format", http.StatusBadRequest)
-		return
-	}
-
-	a.processChan <- orderNumber
-
-	w.WriteHeader(http.StatusOK)
 }
 
 func isDigitsOnly(s string) bool {

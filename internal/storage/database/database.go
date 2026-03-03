@@ -214,12 +214,28 @@ func (d *Database) Withdrawals(ctx context.Context, userID int) ([]model.Withdra
 	return withdrawals, nil
 }
 
-func (d *Database) UpdateOrderStatus(ctx context.Context, orderID, status string, accrual float64) error {
-	_, err := d.db.ExecContext(ctx, `UPDATE orders 
-	SET order_status = $1, accrual = $2 WHERE order_id = $3`, status, accrual, orderID)
+func (d *Database) UpdateOrderProgress(ctx context.Context, newStatus, order, user string, accrual, withdrawn float64) error {
+	tx, err := d.db.Begin()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
+	defer tx.Rollback()
+
+	_, err = tx.ExecContext(ctx, "UPDATE orders SET status = $1 WHERE number = $2", newStatus, order)
+	if err != nil {
+		return fmt.Errorf("failed to update order status: %w", err)
+	}
+
+	_, err = tx.ExecContext(ctx, "UPDATE users SET accrual = accrual + $1, withdrawn = withdrawn + $2 WHERE username = $3",
+		int(accrual*100), int(withdrawn*100), user)
+	if err != nil {
+		return fmt.Errorf("failed to update user balance: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
 	return nil
 }
 

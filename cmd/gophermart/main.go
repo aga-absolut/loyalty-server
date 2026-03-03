@@ -10,25 +10,25 @@ import (
 
 	"github.com/aga-absolut/LoyaltyProgram/internal/app"
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
+	"github.com/aga-absolut/LoyaltyProgram/internal/model"
 	"github.com/aga-absolut/LoyaltyProgram/internal/router"
 	"github.com/aga-absolut/LoyaltyProgram/internal/storage"
 	"github.com/aga-absolut/LoyaltyProgram/internal/storage/database"
 	"github.com/aga-absolut/LoyaltyProgram/internal/workers"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	
 )
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	processChan := make(chan string, 10)
+	pollCh := make(chan model.TypeForChannel, 6)
 	cfg := config.NewConfig()
 	logger := logger.NewLogger()
 	storage := storage.NewStorage(cfg, logger)
-	worker := workers.NewWorkerPool(ctx, processChan, storage, config.SizeWorkers, logger, cfg)
-	app := app.NewApp(cfg, logger, storage, processChan)
+	worker := workers.NewPollWorker(ctx, cfg.SystemAddress, storage, pollCh)
+	app := app.NewApp(cfg, logger, storage)
 	router := router.NewRouter(app)
 	if err := database.InitMigrations(cfg, logger); err != nil {
 		logger.Fatalw("error to init migrations", "error", err)
@@ -55,6 +55,6 @@ func main() {
 		logger.Errorw("Server shutdown error", "Error", err)
 	}
 
-	worker.Stop()
+	worker.StopWorker()
 	logger.Info("Application stopped successfully")
 }
