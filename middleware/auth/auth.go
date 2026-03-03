@@ -39,8 +39,6 @@ func BuildCookie(token string) *http.Cookie {
 		Name:     "token",
 		Value:    token,
 		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
 	}
 }
 
