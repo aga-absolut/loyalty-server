@@ -18,6 +18,22 @@ type Claims struct {
 	UserID int
 }
 
+func BuildCookie(token string) *http.Cookie {
+	return &http.Cookie{
+		Name:     "token",
+		Value:    token,
+		HttpOnly: true,
+	}
+}
+
+func GetUserIDFromContext(ctx context.Context) (int, error) {
+	userID, ok := ctx.Value(userIDKey{}).(int)
+	if !ok {
+		return 0, errs.ErrNoUserID
+	}
+	return userID, nil
+}
+
 func BuildJWTString(userID int) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, &Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -32,14 +48,6 @@ func BuildJWTString(userID int) (string, error) {
 	}
 
 	return tokenString, nil
-}
-
-func BuildCookie(token string) *http.Cookie {
-	return &http.Cookie{
-		Name:     "token",
-		Value:    token,
-		HttpOnly: true,
-	}
 }
 
 func GetUserID(tokenString string) (int, error) {
@@ -57,14 +65,6 @@ func GetUserID(tokenString string) (int, error) {
 		return 0, err
 	}
 	return claims.UserID, nil
-}
-
-func GetUserIDFromContext(ctx context.Context) (int, error) {
-	userID, ok := ctx.Value(userIDKey{}).(int)
-	if !ok {
-		return 0, errs.ErrNoUserID
-	}
-	return userID, nil
 }
 
 func AuthMiddleware(h http.Handler) http.Handler {

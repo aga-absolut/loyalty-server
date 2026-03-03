@@ -2,18 +2,15 @@ package database
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"path/filepath"
 	"runtime"
-	"strconv"
-	"unicode"
 
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
 	"github.com/aga-absolut/LoyaltyProgram/internal/errs"
 	"github.com/aga-absolut/LoyaltyProgram/internal/model"
+	"github.com/aga-absolut/LoyaltyProgram/internal/tools"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -42,7 +39,7 @@ func NewDatabase(config *config.Config, logger *logger.Logger) *Database {
 
 func (d *Database) UserRegistration(ctx context.Context, login, password string) (int, error) {
 	var userID int
-	hashPassword := HashSha256(password)
+	hashPassword := tools.HashSha256(password)
 	err := d.db.QueryRowContext(ctx, `INSERT INTO users (user_login, user_password) 
 	VALUES ($1, $2) RETURNING id`, login, hashPassword).Scan(&userID)
 	if err != nil {
@@ -57,7 +54,7 @@ func (d *Database) UserRegistration(ctx context.Context, login, password string)
 
 func (d *Database) UserAuthentication(ctx context.Context, login, password string) (int, error) {
 	var userID int
-	hashPassword := HashSha256(password)
+	hashPassword := tools.HashSha256(password)
 	row := d.db.QueryRowContext(ctx, `SELECT id FROM users 
 	WHERE user_login = $1 AND user_password = $2`, login, hashPassword)
 	if err := row.Scan(&userID); err != nil {
@@ -71,7 +68,7 @@ func (d *Database) UserAuthentication(ctx context.Context, login, password strin
 
 func (d *Database) AddOrderID(ctx context.Context, userID int, orderID string) error {
 	var checkUserID int
-	if ok := CheckOrderID(orderID); !ok {
+	if ok := tools.CheckOrderID(orderID); !ok {
 		return errs.ErrInvalidOrderID
 	}
 	tx, err := d.db.Begin()
@@ -115,7 +112,7 @@ func (d *Database) GetListOrders(ctx context.Context, userID int) ([]model.ListO
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	orders := make([]model.ListOrders, 0)
 	for rows.Next() {
 		order := model.ListOrders{}
@@ -144,7 +141,7 @@ func (d *Database) GetBalance(ctx context.Context, userID int) (model.Balance, e
 
 func (d *Database) Withdraw(ctx context.Context, userID int, withdrawnRequest model.WithdrawRequest) error {
 	var balance float64
-	if ok := CheckOrderID(withdrawnRequest.Order); !ok {
+	if ok := tools.CheckOrderID(withdrawnRequest.Order); !ok {
 		return errs.ErrInvalidOrderID
 	}
 
@@ -161,14 +158,14 @@ func (d *Database) Withdraw(ctx context.Context, userID int, withdrawnRequest mo
 	}
 
 	if balance < withdrawnRequest.Sum {
-        return errs.ErrNotEnoughMoney
-    }
+		return errs.ErrNotEnoughMoney
+	}
 
-    _, err = tx.ExecContext(ctx, `UPDATE users SET user_balance = user_balance - $1,total_withdrawn = total_withdrawn + $1 
+	_, err = tx.ExecContext(ctx, `UPDATE users SET user_balance = user_balance - $1,total_withdrawn = total_withdrawn + $1 
     WHERE id = $2`, withdrawnRequest.Sum, userID)
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 
 	_, err = tx.ExecContext(ctx, `INSERT INTO withdrawals (user_id, order_id, amount, processed_at) 
 	VALUES ($1, $2, $3, NOW())`, userID, withdrawnRequest.Order, withdrawnRequest.Sum)
@@ -205,33 +202,33 @@ func (d *Database) Withdrawals(ctx context.Context, userID int) ([]model.Withdra
 }
 
 func (d *Database) UpdateOrderStatus(ctx context.Context, orderID, status string, accrual float64) error {
-    tx, err := d.db.Begin()
-    if err != nil {
-        return err
-    }
-    defer tx.Rollback()
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 
-    var userID int
-    err = tx.QueryRowContext(ctx,`SELECT user_id FROM orders WHERE order_id = $1`,orderID,).Scan(&userID)
-    if err != nil {
-        return err
-    }
+	var userID int
+	err = tx.QueryRowContext(ctx, `SELECT user_id FROM orders WHERE order_id = $1`, orderID).Scan(&userID)
+	if err != nil {
+		return err
+	}
 
-    _, err = tx.ExecContext(ctx,`UPDATE orders SET order_status = $1, accrual = $2 
-	WHERE order_id = $3`,status, accrual, orderID,)
-    if err != nil {
-        return err
-    }
+	_, err = tx.ExecContext(ctx, `UPDATE orders SET order_status = $1, accrual = $2 
+	WHERE order_id = $3`, status, accrual, orderID)
+	if err != nil {
+		return err
+	}
 
-    if status == "PROCESSED" && accrual > 0 {
-        _, err = tx.ExecContext(ctx,`UPDATE users SET user_balance = user_balance + $1 
-		WHERE id = $2`,accrual, userID,)
-        if err != nil {
-            return err
-        }
-    }
+	if status == "PROCESSED" && accrual > 0 {
+		_, err = tx.ExecContext(ctx, `UPDATE users SET user_balance = user_balance + $1 
+		WHERE id = $2`, accrual, userID)
+		if err != nil {
+			return err
+		}
+	}
 
-    return tx.Commit()
+	return tx.Commit()
 }
 
 // addition
@@ -269,29 +266,4 @@ func InitMigrations(config *config.Config, logger *logger.Logger) error {
 		return err
 	}
 	return nil
-}
-
-func CheckOrderID(orderID string) bool {
-	for _, r := range orderID {
-		if !unicode.IsDigit(r) {
-			return false
-		}
-	}
-	sum := 0
-	for i := len(orderID) - 1; i >= 0; i-- {
-		digit, _ := strconv.Atoi(string(orderID[i]))
-		if (len(orderID)-i)%2 == 0 {
-			digit *= 2
-			if digit > 9 {
-				digit -= 9
-			}
-		}
-		sum += digit
-	}
-	return sum%10 == 0
-}
-
-func HashSha256(password string) string {
-	data := sha256.Sum256([]byte(password))
-	return hex.EncodeToString(data[:])
 }
