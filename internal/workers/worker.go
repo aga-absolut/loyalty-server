@@ -56,7 +56,9 @@ func (w *Worker) worker(ctx context.Context) {
 				return
 			}
 
-			w.pollOrderUntilFinal(ctx, orderID)
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+            w.pollOrderUntilFinal(ctx, orderID)
+            cancel()
 		}
 	}
 }
