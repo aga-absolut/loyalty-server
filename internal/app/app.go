@@ -11,23 +11,23 @@ import (
 	"github.com/aga-absolut/LoyaltyProgram/internal/errs"
 	"github.com/aga-absolut/LoyaltyProgram/internal/model"
 	"github.com/aga-absolut/LoyaltyProgram/internal/repository"
-	"github.com/aga-absolut/LoyaltyProgram/middleware/jwt"
+	"github.com/aga-absolut/LoyaltyProgram/middleware/auth"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
 	"github.com/go-chi/chi"
 )
 
 type App struct {
 	processChan chan string
-	config  *config.Config
-	logger  *logger.Logger
-	storage repository.Storage
+	config      *config.Config
+	logger      *logger.Logger
+	storage     repository.Storage
 }
 
 func NewApp(config *config.Config, logger *logger.Logger, storage repository.Storage, processChan chan string) *App {
 	return &App{
-		config:  config,
-		logger:  logger,
-		storage: storage,
+		config:      config,
+		logger:      logger,
+		storage:     storage,
 		processChan: processChan,
 	}
 }
@@ -54,12 +54,12 @@ func (a *App) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := jwt.BuildJWTString(userID)
+	token, err := auth.BuildJWTString(userID)
 	if err != nil {
 		http.Error(w, "error to create JWT", http.StatusInternalServerError)
 		return
 	}
-	cookie := jwt.BuildCookie(token)
+	cookie := auth.BuildCookie(token)
 	http.SetCookie(w, cookie)
 	w.WriteHeader(http.StatusOK)
 }
@@ -86,12 +86,12 @@ func (a *App) AuthHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := jwt.BuildJWTString(userID)
+	token, err := auth.BuildJWTString(userID)
 	if err != nil {
 		http.Error(w, "error to create JWT", http.StatusInternalServerError)
 		return
 	}
-	cookie := jwt.BuildCookie(token)
+	cookie := auth.BuildCookie(token)
 	http.SetCookie(w, cookie)
 	w.WriteHeader(http.StatusOK)
 }
@@ -104,7 +104,7 @@ func (a *App) AddOrderIDHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	orderID := string(data)
 
-	userID, err := jwt.GetUserIDFromContext(r.Context())
+	userID, err := auth.GetUserIDFromContext(r.Context())
 	if errors.Is(err, errs.ErrNoUserID) {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
@@ -128,7 +128,7 @@ func (a *App) AddOrderIDHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) GetListOrdersHandler(w http.ResponseWriter, r *http.Request) {
-	userID, err := jwt.GetUserIDFromContext(r.Context())
+	userID, err := auth.GetUserIDFromContext(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
@@ -153,7 +153,7 @@ func (a *App) GetListOrdersHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) GetBalanceHandler(w http.ResponseWriter, r *http.Request) {
-	userID, err := jwt.GetUserIDFromContext(r.Context())
+	userID, err := auth.GetUserIDFromContext(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
@@ -174,7 +174,7 @@ func (a *App) GetBalanceHandler(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) WithdrawHandler(w http.ResponseWriter, r *http.Request) {
 	withdrawRequest := model.WithdrawRequest{}
-	userID, err := jwt.GetUserIDFromContext(r.Context())
+	userID, err := auth.GetUserIDFromContext(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
@@ -206,7 +206,7 @@ func (a *App) WithdrawHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) GetWithdraawalsHandler(w http.ResponseWriter, r *http.Request) {
-	userID, err := jwt.GetUserIDFromContext(r.Context())
+	userID, err := auth.GetUserIDFromContext(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
@@ -233,7 +233,7 @@ func (a *App) GetWithdraawalsHandler(w http.ResponseWriter, r *http.Request) {
 // addition
 func (a *App) AddAccrualHandler(w http.ResponseWriter, r *http.Request) {
 	sum := model.Sum{}
-	userID, err := jwt.GetUserIDFromContext(r.Context())
+	userID, err := auth.GetUserIDFromContext(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
@@ -270,7 +270,7 @@ func (a *App) PollAccrualSystem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.processChan <- orderNumber
-	
+
 	w.WriteHeader(http.StatusOK)
 }
 

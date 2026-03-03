@@ -10,4 +10,5 @@ var (
 	ErrOrderIDUsed          = errors.New("order used")
 	ErrOrderIDUsedByAnother = errors.New("order used")
 	ErrNotEnoughMoney       = errors.New("not enough money")
+	ErrTooManyRequests      = errors.New("429 Too Many Requests")
 )

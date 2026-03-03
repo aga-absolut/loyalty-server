@@ -26,13 +26,13 @@ func main() {
 	processChan := make(chan string, 10)
 	cfg := config.NewConfig()
 	logger := logger.NewLogger()
-	if err := database.InitMigrations(cfg, logger); err != nil {
-		logger.Fatalw("error to init migrations", "error", err)
-	}
 	storage := storage.NewStorage(cfg, logger)
 	worker := workers.NewWorkerPool(ctx, processChan, storage, config.SizeWorkers, logger, cfg)
 	app := app.NewApp(cfg, logger, storage, processChan)
 	router := router.NewRouter(app)
+	if err := database.InitMigrations(cfg, logger); err != nil {
+		logger.Fatalw("error to init migrations", "error", err)
+	}
 
 	server := &http.Server{
 		Addr:    cfg.RunAddress,

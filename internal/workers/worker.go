@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
+	"github.com/aga-absolut/LoyaltyProgram/internal/errs"
 	"github.com/aga-absolut/LoyaltyProgram/internal/model"
 	"github.com/aga-absolut/LoyaltyProgram/internal/repository"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
@@ -75,15 +76,13 @@ func (w *Worker) Stop() {
 func (w *Worker) fetchAccrualFromExternal(orderID string) (string, int, error) {
 	url := fmt.Sprintf("%s/api/orders/%s", w.config.SystemAddress, orderID)
 
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	defer cancel()
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
-	if err != nil {
-		return "", 0, err
-	}
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req.Header.Set("Accept", "application/json")
 
+	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", 0, err
@@ -99,6 +98,10 @@ func (w *Worker) fetchAccrualFromExternal(orderID string) (string, int, error) {
 		return accrualResp.Status, accrualResp.Accrual, nil
 	case http.StatusNoContent:
 		return "NOT_FOUND", 0, nil
+
+	case http.StatusTooManyRequests:
+		return "", 0, errs.ErrTooManyRequests
+
 	default:
 		return "", 0, fmt.Errorf("unexpected status: %d", resp.StatusCode)
 	}
