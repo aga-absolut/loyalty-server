@@ -114,6 +114,8 @@ func (d *Database) GetListOrders(ctx context.Context, userID int) ([]model.ListO
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+	
 	orders := make([]model.ListOrders, 0)
 	for rows.Next() {
 		order := model.ListOrders{}
