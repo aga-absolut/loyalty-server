@@ -62,47 +62,41 @@ func (w *Worker) worker(ctx context.Context) {
 }
 
 func (w *Worker) pollOrderUntilFinal(ctx context.Context, orderID string) {
-	var (
-		tout = time.After(2 * time.Minute)
-		pollInterval = 1 * time.Second
-		maxAttempts  = 12
-		attempt = 0
-	)
+    tout := time.After(2 * time.Minute)
+    ticker := time.NewTicker(5 * time.Second) 
+    defer ticker.Stop()
 
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case <-ticker.C:
+            status, accrual, err := w.fetchAccrualFromExternal(ctx, orderID)
+            if err != nil {
+                w.logger.Errorw("failed to fetch accrual", "orderID", orderID, "err", err)
+                continue
+            }
+            if updateErr := w.storage.UpdateOrderStatus(ctx, orderID, status, accrual); updateErr != nil {
+                w.logger.Errorw("failed to update order status",
+                    "orderID", orderID,
+                    "err", updateErr,
+                )
+            }
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			attempt++
+            if status == "PROCESSED" || status == "INVALID" {
+                w.logger.Infow("Order processing finished",
+                    "orderID", orderID,
+                    "status", status,
+                    "accrual", accrual,
+                )
+                return
+            }
 
-			if attempt > maxAttempts {
-				w.logger.Errorw("No more than 12 requests per minute allowed")
-			}
-
-			status, accrual, err := w.fetchAccrualFromExternal(ctx, orderID)
-			if err != nil {
-				w.logger.Errorw("failed to fetch accrual", "orderID", orderID, "err", err)
-			}
-			if status == "PROCESSED" {
-				if updateErr := w.storage.UpdateOrderStatus(ctx, orderID, status, accrual); updateErr != nil {
-					w.logger.Errorw("failed to update order status",
-						"orderID", orderID,
-						"err", updateErr,
-					)
-				}
-			} else {
-				fmt.Println(status, " not equal PROCESSED!")
-			}
-
-		case <-tout:
-			w.logger.Info("timeout")
-			return
-		}
-	}
+        case <-tout:
+            w.logger.Infow("Polling timeout reached", "orderID", orderID)
+            return
+        }
+    }
 }
 
 func (w *Worker) fetchAccrualFromExternal(ctx context.Context, orderID string) (string, float64, error) {
@@ -120,14 +114,7 @@ func (w *Worker) fetchAccrualFromExternal(ctx context.Context, orderID string) (
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println("read response error:", err)
-	}
-
 	err = json.Unmarshal(body, &response)
-	if err != nil {
-		fmt.Println("read response error:", err)
-	}
 	return response.Status, response.Accrual, nil
 }
 
