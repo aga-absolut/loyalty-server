@@ -54,7 +54,7 @@ func (w *Worker) worker(ctx context.Context) {
 			if !ok {
 				return
 			}
-			w.pollOrderUntilFinal(ctx, orderID)
+			go w.pollOrderUntilFinal(ctx, orderID)
 		}
 	}
 }
