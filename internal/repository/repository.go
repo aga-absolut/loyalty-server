@@ -8,7 +8,7 @@ import (
 
 type Storage interface {
 	Withdraw(ctx context.Context, userID int, withdrawnRequest model.WithdrawRequest) error
-	UpdateOrderStatus(ctx context.Context, orderID, status string, accrual int) error
+	UpdateOrderStatus(ctx context.Context, orderID, status string, accrual float64) error
 	Withdrawals(ctx context.Context, userID int) ([]model.WithdrawResponse, error)
 	UserAuthentication(ctx context.Context, login, password string) (int, error)
 	UserRegistration(ctx context.Context, login, password string) (int, error)

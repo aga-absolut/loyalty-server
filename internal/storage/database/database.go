@@ -203,7 +203,7 @@ func (d *Database) Withdrawals(ctx context.Context, userID int) ([]model.Withdra
 	return withdrawals, nil
 }
 
-func (d *Database) UpdateOrderStatus(ctx context.Context, orderID, status string, accrual int) error {
+func (d *Database) UpdateOrderStatus(ctx context.Context, orderID, status string, accrual float64) error {
     tx, err := d.db.Begin()
     if err != nil {
         return err

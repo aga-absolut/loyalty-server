@@ -104,7 +104,7 @@ func (w *Worker) pollOrderUntilFinal(ctx context.Context, orderID string) {
 	}
 }
 
-func (w *Worker) fetchAccrualFromExternal(orderID string) (string, int, error) {
+func (w *Worker) fetchAccrualFromExternal(orderID string) (string, float64, error) {
 	url := fmt.Sprintf("%s/api/orders/%s", w.config.SystemAddress, orderID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
