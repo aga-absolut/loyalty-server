@@ -32,6 +32,7 @@ func NewPollWorker(ctx context.Context, accrual string, storage repository.Stora
 
 	return worker
 }
+
 func (w *Worker) PollOrderStatus(ctx context.Context) {
 	defer w.wg.Done()
 	for {
@@ -42,75 +43,69 @@ func (w *Worker) PollOrderStatus(ctx context.Context) {
 			if !ok {
 				return
 			}
-			// ← Вот главное: асинхронный запуск polling'а
-			go w.pollAsync(context.Background(), order)
+			err := w.Poll(ctx, order)
+			if err != nil {
+				return
+			}
 		}
 	}
 }
 
-// Новый метод: асинхронный polling одного заказа
-func (w *Worker) pollAsync(ctx context.Context, order model.TypeForChannel) {
-	const pollInterval = 5 * time.Second // для тестов достаточно 5 сек
-	const maxAttempts = 20              // ~100 сек
-
+func (w *Worker) Poll(ctx context.Context, order model.TypeForChannel) error {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	timeout := time.After(2 * time.Minute)
 	attempts := 0
-
-	for attempts < maxAttempts {
-		attempts++
-
-		// Проверяем отмену перед запросом
+	maxAttempts := 12
+	for {
 		select {
 		case <-ctx.Done():
-			return
-		default:
-		}
+			return nil
+		case <-ticker.C:
+			var response model.AccrualResponse
+			attempts++
 
-		url := fmt.Sprintf("%s/api/orders/%s", w.accrual, order.OrderNum)
-		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-		if err != nil {
-			time.Sleep(pollInterval) // временно — лучше заменить ниже
-			continue
-		}
-
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			time.Sleep(pollInterval)
-			continue
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			time.Sleep(pollInterval)
-			continue
-		}
-
-		var response model.AccrualResponse
-		if err := json.Unmarshal(body, &response); err != nil {
-			time.Sleep(pollInterval)
-			continue
-		}
-
-		if response.Status == "PROCESSED" {
-			err = w.storage.UpdateOrderProgress(ctx, response.Status, response.Order, order.User, float64(response.Accrual), 0)
-			if err != nil {
-				// логгируй ошибку, но не останавливай
+			if attempts > maxAttempts {
+				return fmt.Errorf("превышено количество попыток")
 			}
-			return // успех — выходим
-		}
+			url := fmt.Sprintf("%s/api/orders/%s", w.accrual, order.OrderNum)
+			req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+			if err != nil {
+				fmt.Println("req create error:", err)
+				continue
+			}
+			client := &http.Client{}
+			resp, err := client.Do(req)
+			if err != nil {
+				fmt.Println("poll error:", err)
+				continue
+			}
 
-		// Не PROCESSED — ждём, но отменяемо
-		timer := time.NewTimer(pollInterval)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return
-		case <-timer.C:
-			// продолжаем
+			body, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if err != nil {
+				fmt.Println("read response error:", err)
+				continue
+			}
+
+			err = json.Unmarshal(body, &response)
+			if err != nil {
+				return fmt.Errorf("ошибка парсинга: ")
+			}
+
+			if response.Status == "PROCESSED" {
+				err = w.storage.UpdateOrderProgress(ctx, response.Status, response.Order, order.User, response.Accrual, 0)
+				if err != nil {
+					return fmt.Errorf("error in update db: ")
+				}
+				return nil
+			} else {
+				fmt.Println(response.Status, " not equal PROCESSED!")
+			}
+		case <-timeout:
+			return fmt.Errorf("time is out")
 		}
 	}
-	// max attempts — можно пометить заказ как FAILED
 }
 
 func (w *Worker) StopWorker() {

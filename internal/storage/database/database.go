@@ -110,27 +110,17 @@ func (d *Database) AddOrderID(ctx context.Context, userID int, orderID string) e
 }
 
 func (d *Database) GetListOrders(ctx context.Context, userID int) ([]model.ListOrders, error) {
-	rows, err := d.db.QueryContext(ctx, `SELECT order_id, order_status, accrual, uploaded_at FROM orders
+	rows, err := d.db.QueryContext(ctx, `SELECT order_id, order_status, uploaded_at FROM orders
 	WHERE user_id = $1 ORDER BY uploaded_at DESC`, userID)
 	if err != nil {
 		return nil, err
 	}
 	orders := make([]model.ListOrders, 0)
-	var accrualStr string
 	for rows.Next() {
 		order := model.ListOrders{}
-		err := rows.Scan(&order.Number, &order.Status, &accrualStr, &order.UploadedAt)
+		err := rows.Scan(&order.Number, &order.Status, &order.UploadedAt)
 		if err != nil {
 			return nil, err
-		}
-		if accrualStr != "" {
-			f, err := strconv.ParseFloat(accrualStr, 64)
-			if err != nil {
-				return nil, fmt.Errorf("parse accrual '%s' failed: %w", accrualStr, err)
-			}
-			order.Accrual = f
-		} else {
-			order.Accrual = 0
 		}
 		orders = append(orders, order)
 	}
@@ -214,7 +204,7 @@ func (d *Database) Withdrawals(ctx context.Context, userID int) ([]model.Withdra
 	return withdrawals, nil
 }
 
-func (d *Database) UpdateOrderProgress(ctx context.Context, newStatus, order, user string, accrual, withdrawn float64) error {
+func (d *Database) UpdateOrderProgress(ctx context.Context, newStatus, order, user string, accrual int, withdrawn float64) error {
 	tx, err := d.db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
