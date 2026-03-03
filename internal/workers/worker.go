@@ -62,41 +62,41 @@ func (w *Worker) worker(ctx context.Context) {
 }
 
 func (w *Worker) pollOrderUntilFinal(ctx context.Context, orderID string) {
-    tout := time.After(2 * time.Minute)
-    ticker := time.NewTicker(5 * time.Second) 
-    defer ticker.Stop()
+	tout := time.After(2 * time.Minute)
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 
-    for {
-        select {
-        case <-ctx.Done():
-            return
-        case <-ticker.C:
-            status, accrual, err := w.fetchAccrualFromExternal(ctx, orderID)
-            if err != nil {
-                w.logger.Errorw("failed to fetch accrual", "orderID", orderID, "err", err)
-                continue
-            }
-            if updateErr := w.storage.UpdateOrderStatus(ctx, orderID, status, accrual); updateErr != nil {
-                w.logger.Errorw("failed to update order status",
-                    "orderID", orderID,
-                    "err", updateErr,
-                )
-            }
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			status, accrual, err := w.fetchAccrualFromExternal(ctx, orderID)
+			if err != nil {
+				w.logger.Errorw("failed to fetch accrual", "orderID", orderID, "err", err)
+				continue
+			}
+			if updateErr := w.storage.UpdateOrderStatus(ctx, orderID, status, accrual); updateErr != nil {
+				w.logger.Errorw("failed to update order status",
+					"orderID", orderID,
+					"err", updateErr,
+				)
+			}
 
-            if status == "PROCESSED" || status == "INVALID" {
-                w.logger.Infow("Order processing finished",
-                    "orderID", orderID,
-                    "status", status,
-                    "accrual", accrual,
-                )
-                return
-            }
+			if status == "PROCESSED" || status == "INVALID" {
+				w.logger.Infow("Order processing finished",
+					"orderID", orderID,
+					"status", status,
+					"accrual", accrual,
+				)
+				return
+			}
 
-        case <-tout:
-            w.logger.Infow("Polling timeout reached", "orderID", orderID)
-            return
-        }
-    }
+		case <-tout:
+			w.logger.Infow("Polling timeout reached", "orderID", orderID)
+			return
+		}
+	}
 }
 
 func (w *Worker) fetchAccrualFromExternal(ctx context.Context, orderID string) (string, float64, error) {
@@ -112,9 +112,15 @@ func (w *Worker) fetchAccrualFromExternal(ctx context.Context, orderID string) (
 		return "", 0, err
 	}
 	defer resp.Body.Close()
-
+	
 	body, err := io.ReadAll(resp.Body)
-	err = json.Unmarshal(body, &response)
+	if err != nil {
+		return "", 0, err
+	}
+
+	if err := json.Unmarshal(body, &response); err != nil {
+		return "", 0, fmt.Errorf("failed to unmarshal accrual response: %w", err)
+	}
 	return response.Status, response.Accrual, nil
 }
 
