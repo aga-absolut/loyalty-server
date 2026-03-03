@@ -54,26 +54,41 @@ func (w *Worker) worker(ctx context.Context) {
 			if !ok {
 				return
 			}
-			status, accrual, err := w.fetchAccrualFromExternal(orderID)
-			if err != nil {
-				w.logger.Errorw("failed to fetch accrual", "orderID", orderID, "err", err)
-				continue
-			}
-			err = w.storage.UpdateOrderStatus(ctx, orderID, status, accrual)
-			if err != nil {
-				w.logger.Errorw("failed to update order status", "orderID", orderID, "err", err)
-				continue
-			}
+			w.pollOrderUntilFinal(ctx, orderID)
 		}
 	}
 }
 
-func (w *Worker) Stop() {
-	close(w.processChan)
-	w.wg.Wait()
+func (w *Worker) pollOrderUntilFinal(ctx context.Context, orderID string) {
+	const (
+		pollInterval = 10 * time.Second
+		maxAttempts  = 10
+	)
+	attempt := 0
+	for attempt < maxAttempts {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			attempt++
+			status, accrual, err := w.fetchAccrualFromExternal(orderID)
+			if err != nil {
+				time.Sleep(pollInterval)
+				continue
+			}
+			isFinal := status == "PROCESSED" || status == "INVALID"
+			if updateErr := w.storage.UpdateOrderStatus(ctx, orderID, status, accrual); updateErr != nil {
+				w.logger.Errorw("failed to update order status", "orderID", orderID, "err", updateErr)
+			}
+			if isFinal {
+				return
+			}
+			time.Sleep(pollInterval)
+		}
+	}
 }
 
-func (w *Worker) fetchAccrualFromExternal(orderID string) (string, int, error) {
+func (w *Worker) fetchAccrualFromExternal(orderID string) (string, float64, error) {
 	url := fmt.Sprintf("%s/api/orders/%s", w.config.SystemAddress, orderID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
@@ -105,4 +120,9 @@ func (w *Worker) fetchAccrualFromExternal(orderID string) (string, int, error) {
 	default:
 		return "", 0, fmt.Errorf("unexpected status: %d", resp.StatusCode)
 	}
+}
+
+func (w *Worker) Stop() {
+	close(w.processChan)
+	w.wg.Wait()
 }
