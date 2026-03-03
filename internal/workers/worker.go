@@ -57,8 +57,8 @@ func (w *Worker) worker(ctx context.Context) {
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-            w.pollOrderUntilFinal(ctx, orderID)
-            cancel()
+			w.pollOrderUntilFinal(ctx, orderID)
+			cancel()
 		}
 	}
 }
@@ -69,33 +69,37 @@ func (w *Worker) pollOrderUntilFinal(ctx context.Context, orderID string) {
 		maxAttempts  = 12
 	)
 
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	tout := time.After(2 * time.Minute)
+
 	attempt := 0
 
-	for attempt < maxAttempts {
+	for {
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-ticker.C:
 			attempt++
-
 			status, accrual, err := w.fetchAccrualFromExternal(orderID)
 			if err != nil {
-				time.Sleep(pollInterval)
-				continue
+				w.logger.Errorw("failed to fetch accrual", "orderID", orderID, "err", err)
 			}
-			isFinal := status == "PROCESSED" || status == "INVALID"
-			updateErr := w.storage.UpdateOrderStatus(ctx, orderID, status, accrual)
-			if updateErr != nil {
+
+			if updateErr := w.storage.UpdateOrderStatus(ctx, orderID, status, accrual); updateErr != nil {
 				w.logger.Errorw("failed to update order status",
 					"orderID", orderID,
 					"err", updateErr,
 				)
 			}
-
-			if isFinal {
+			isFinal := status == "PROCESSED" || status == "INVALID"
+			if isFinal || attempt >= maxAttempts {
 				return
 			}
-			time.Sleep(pollInterval)
+		case <-tout:
+			w.logger.Info("timeout")
+			return
 		}
 	}
 }

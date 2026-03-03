@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"unicode"
 
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
 	"github.com/aga-absolut/LoyaltyProgram/internal/errs"
@@ -16,19 +15,19 @@ import (
 )
 
 type App struct {
-	config  *config.Config
-	logger  *logger.Logger
-	storage repository.Storage
+	config      *config.Config
+	logger      *logger.Logger
+	storage     repository.Storage
 	processChan chan string
 }
 
 func NewApp(config *config.Config, logger *logger.Logger, storage repository.Storage, processChan chan string) *App {
-    return &App{
-        config:      config,
-        logger:      logger,
-        storage:     storage,
-        processChan: processChan,
-    }
+	return &App{
+		config:      config,
+		logger:      logger,
+		storage:     storage,
+		processChan: processChan,
+	}
 }
 
 func (a *App) RegisterHandler(w http.ResponseWriter, r *http.Request) {
@@ -125,6 +124,7 @@ func (a *App) AddOrderIDHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.processChan <- orderID
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -203,6 +203,7 @@ func (a *App) WithdrawHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -254,15 +255,6 @@ func (a *App) AddAccrualHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-}
-
-func isDigitsOnly(s string) bool {
-	for _, r := range s {
-		if !unicode.IsDigit(r) {
-			return false
-		}
-	}
-	return true
 }
