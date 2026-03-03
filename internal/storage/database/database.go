@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -115,11 +116,21 @@ func (d *Database) GetListOrders(ctx context.Context, userID int) ([]model.ListO
 		return nil, err
 	}
 	orders := make([]model.ListOrders, 0)
+	var accrualStr string
 	for rows.Next() {
 		order := model.ListOrders{}
-		err := rows.Scan(&order.Number, &order.Status, &order.Accrual, &order.UploadedAt)
+		err := rows.Scan(&order.Number, &order.Status, &accrualStr, &order.UploadedAt)
 		if err != nil {
 			return nil, err
+		}
+		if accrualStr != "" {
+			f, err := strconv.ParseFloat(accrualStr, 64)
+			if err != nil {
+				return nil, fmt.Errorf("parse accrual '%s' failed: %w", accrualStr, err)
+			}
+			order.Accrual = f
+		} else {
+			order.Accrual = 0
 		}
 		orders = append(orders, order)
 	}
