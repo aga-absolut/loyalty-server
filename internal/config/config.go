@@ -23,7 +23,7 @@ func NewConfig() *Config {
 	cfg := &Config{}
 	flag.StringVar(&cfg.RunAddress, "a", "localhost:8080", "address and port")
 	flag.StringVar(&cfg.DatabaseURI, "d", "postgres://postgres:absolute_1@localhost:5432/LoyalProgram", "name to connect database")
-	flag.StringVar(&cfg.SystemAddress, "r", "", "")
+	flag.StringVar(&cfg.SystemAddress, "r", "http://localhost:35067", "")
 	if err := env.Parse(cfg); err != nil {
 		return nil
 	}
