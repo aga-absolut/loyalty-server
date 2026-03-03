@@ -204,12 +204,33 @@ func (d *Database) Withdrawals(ctx context.Context, userID int) ([]model.Withdra
 }
 
 func (d *Database) UpdateOrderStatus(ctx context.Context, orderID, status string, accrual int) error {
-	_, err := d.db.ExecContext(ctx, `UPDATE orders 
-	SET order_status = $1, accrual = $2 WHERE order_id = $3`, status, accrual, orderID)
-	if err != nil {
-		return err
-	}
-	return nil
+    tx, err := d.db.Begin()
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback()
+
+    var userID int
+    err = tx.QueryRowContext(ctx,`SELECT user_id FROM orders WHERE order_id = $1`,orderID,).Scan(&userID)
+    if err != nil {
+        return err
+    }
+
+    _, err = tx.ExecContext(ctx,`UPDATE orders SET order_status = $1, accrual = $2 
+	WHERE order_id = $3`,status, accrual, orderID,)
+    if err != nil {
+        return err
+    }
+
+    if status == "PROCESSED" && accrual > 0 {
+        _, err = tx.ExecContext(ctx,`UPDATE users SET user_balance = user_balance + $1 
+		WHERE id = $2`,accrual, userID,)
+        if err != nil {
+            return err
+        }
+    }
+
+    return tx.Commit()
 }
 
 // addition

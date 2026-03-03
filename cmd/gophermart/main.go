@@ -22,7 +22,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	processChan := make(chan string, 10)
+	processChan := make(chan string, 100)
 	cfg := config.NewConfig()
 	logger := logger.NewLogger()
 	storage := storage.NewStorage(cfg, logger)

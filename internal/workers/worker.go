@@ -56,14 +56,14 @@ func (w *Worker) worker(ctx context.Context) {
 				return
 			}
 
-			go w.pollOrderUntilFinal(ctx, orderID)
+			w.pollOrderUntilFinal(ctx, orderID)
 		}
 	}
 }
 
 func (w *Worker) pollOrderUntilFinal(ctx context.Context, orderID string) {
 	const (
-		pollInterval = 10 * time.Second
+		pollInterval = 1 * time.Second
 		maxAttempts  = 12
 	)
 
