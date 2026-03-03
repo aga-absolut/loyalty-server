@@ -10,7 +10,6 @@ import (
 
 	"github.com/aga-absolut/LoyaltyProgram/internal/app"
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
-	"github.com/aga-absolut/LoyaltyProgram/internal/model"
 	"github.com/aga-absolut/LoyaltyProgram/internal/router"
 	"github.com/aga-absolut/LoyaltyProgram/internal/storage"
 	"github.com/aga-absolut/LoyaltyProgram/internal/storage/database"
@@ -23,11 +22,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	pollCh := make(chan model.TypeForChannel, 6)
+	processChan := make(chan string, 10)
 	cfg := config.NewConfig()
 	logger := logger.NewLogger()
 	storage := storage.NewStorage(cfg, logger)
-	worker := workers.NewPollWorker(ctx, cfg.SystemAddress, storage, pollCh)
+	worker := workers.NewPollWorker(ctx, processChan, storage, config.SizeWorkers, logger, cfg)
 	app := app.NewApp(cfg, logger, storage)
 	router := router.NewRouter(app)
 	if err := database.InitMigrations(cfg, logger); err != nil {
@@ -55,6 +54,6 @@ func main() {
 		logger.Errorw("Server shutdown error", "Error", err)
 	}
 
-	worker.StopWorker()
+	worker.Stop()
 	logger.Info("Application stopped successfully")
 }

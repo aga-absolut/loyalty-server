@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -110,7 +109,7 @@ func (d *Database) AddOrderID(ctx context.Context, userID int, orderID string) e
 }
 
 func (d *Database) GetListOrders(ctx context.Context, userID int) ([]model.ListOrders, error) {
-	rows, err := d.db.QueryContext(ctx, `SELECT order_id, order_status, uploaded_at FROM orders
+	rows, err := d.db.QueryContext(ctx, `SELECT order_id, order_status, accrual, uploaded_at FROM orders
 	WHERE user_id = $1 ORDER BY uploaded_at DESC`, userID)
 	if err != nil {
 		return nil, err
@@ -118,7 +117,7 @@ func (d *Database) GetListOrders(ctx context.Context, userID int) ([]model.ListO
 	orders := make([]model.ListOrders, 0)
 	for rows.Next() {
 		order := model.ListOrders{}
-		err := rows.Scan(&order.Number, &order.Status, &order.UploadedAt)
+		err := rows.Scan(&order.Number, &order.Status, &order.Accrual, &order.UploadedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -204,28 +203,12 @@ func (d *Database) Withdrawals(ctx context.Context, userID int) ([]model.Withdra
 	return withdrawals, nil
 }
 
-func (d *Database) UpdateOrderProgress(ctx context.Context, newStatus, order, user string, accrual int, withdrawn float64) error {
-	tx, err := d.db.Begin()
+func (d *Database) UpdateOrderStatus(ctx context.Context, orderID, status string, accrual int) error {
+	_, err := d.db.ExecContext(ctx, `UPDATE orders 
+	SET order_status = $1, accrual = $2 WHERE order_id = $3`, status, accrual, orderID)
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return err
 	}
-	defer tx.Rollback()
-
-	_, err = tx.ExecContext(ctx, "UPDATE orders SET status = $1 WHERE number = $2", newStatus, order)
-	if err != nil {
-		return fmt.Errorf("failed to update order status: %w", err)
-	}
-
-	_, err = tx.ExecContext(ctx, "UPDATE users SET accrual = accrual + $1, withdrawn = withdrawn + $2 WHERE username = $3",
-		int(accrual*100), int(withdrawn*100), user)
-	if err != nil {
-		return fmt.Errorf("failed to update user balance: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
 	return nil
 }
 
