@@ -19,7 +19,7 @@ type (
 		responseData
 	}
 
-	Logger struct{
+	Logger struct {
 		*zap.SugaredLogger
 	}
 )
@@ -54,8 +54,7 @@ func WithLogging(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
-		responseData := responseData{}
-		lw := LoggingResponseWriter{ResponseWriter: w, responseData: responseData}
+		lw := LoggingResponseWriter{ResponseWriter: w, responseData: responseData{}}
 
 		h.ServeHTTP(&lw, r)
 		duration := time.Since(start)
@@ -66,8 +65,8 @@ func WithLogging(h http.Handler) http.Handler {
 			"Method:", r.Method, "\n",
 			"Duration:", duration, "\n",
 			"-----RESPONSE-----\n",
-			"Status:", responseData.statuscode, "\n",
-			"Size:", responseData.size, "\n",
+			"Status:", lw.statuscode, "\n",
+			"Size:", lw.size, "\n",
 		)
 	})
 }
