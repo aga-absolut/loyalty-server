@@ -16,7 +16,7 @@ CREATE TABLE orders(
     user_id INTEGER NOT NULL,
     order_id TEXT NOT NULL UNIQUE,
     order_status TEXT NOT NULL DEFAULT 'NEW',
-    accrual DECIMAL(10,1) DEFAULT 0.0,
+    accrual INTEGER DEFAULT 0.0,
     uploaded_at TIMESTAMPTZ DEFAULT NOW()
 );
 
