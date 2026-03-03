@@ -16,7 +16,7 @@ type ListOrders struct {
 
 type Balance struct {
 	Current   float64 `json:"current"`
-	WithDrawn int     `json:"withdrawn"`
+	WithDrawn float64 `json:"withdrawn"`
 }
 
 type WithdrawRequest struct {

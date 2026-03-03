@@ -158,16 +158,15 @@ func (d *Database) Withdraw(ctx context.Context, userID int, withdrawnRequest mo
 		return err
 	}
 
-	if balance >= withdrawnRequest.Sum {
-		balance -= withdrawnRequest.Sum
-	} else {
-		return errs.ErrNotEnoughMoney
-	}
+	if balance < withdrawnRequest.Sum {
+        return errs.ErrNotEnoughMoney
+    }
 
-	_, err = tx.ExecContext(ctx, `UPDATE users SET user_balance = $1 WHERE id = $2`, balance, userID)
-	if err != nil {
-		return err
-	}
+    _, err = tx.ExecContext(ctx, `UPDATE users SET user_balance = user_balance - $1,total_withdrawn = total_withdrawn + $1 
+    WHERE id = $2`, withdrawnRequest.Sum, userID)
+    if err != nil {
+        return err
+    }
 
 	_, err = tx.ExecContext(ctx, `INSERT INTO withdrawals (user_id, order_id, amount, processed_at) 
 	VALUES ($1, $2, $3, NOW())`, userID, withdrawnRequest.Order, withdrawnRequest.Sum)
