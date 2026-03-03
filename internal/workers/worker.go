@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
-	"github.com/aga-absolut/LoyaltyProgram/internal/errs"
 	"github.com/aga-absolut/LoyaltyProgram/internal/model"
 	"github.com/aga-absolut/LoyaltyProgram/internal/repository"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
@@ -56,25 +56,21 @@ func (w *Worker) worker(ctx context.Context) {
 				return
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			w.pollOrderUntilFinal(ctx, orderID)
-			cancel()
 		}
 	}
 }
 
 func (w *Worker) pollOrderUntilFinal(ctx context.Context, orderID string) {
-	const (
+	var (
+		tout = time.After(2 * time.Minute)
 		pollInterval = 1 * time.Second
 		maxAttempts  = 12
+		attempt = 0
 	)
 
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
-
-	tout := time.After(2 * time.Minute)
-
-	attempt := 0
 
 	for {
 		select {
@@ -82,21 +78,26 @@ func (w *Worker) pollOrderUntilFinal(ctx context.Context, orderID string) {
 			return
 		case <-ticker.C:
 			attempt++
-			status, accrual, err := w.fetchAccrualFromExternal(orderID)
+
+			if attempt > maxAttempts {
+				w.logger.Errorw("No more than 12 requests per minute allowed")
+			}
+
+			status, accrual, err := w.fetchAccrualFromExternal(ctx, orderID)
 			if err != nil {
 				w.logger.Errorw("failed to fetch accrual", "orderID", orderID, "err", err)
 			}
+			if status == "PROCESSED" {
+				if updateErr := w.storage.UpdateOrderStatus(ctx, orderID, status, accrual); updateErr != nil {
+					w.logger.Errorw("failed to update order status",
+						"orderID", orderID,
+						"err", updateErr,
+					)
+				}
+			} else {
+				fmt.Println(status, " not equal PROCESSED!")
+			}
 
-			if updateErr := w.storage.UpdateOrderStatus(ctx, orderID, status, accrual); updateErr != nil {
-				w.logger.Errorw("failed to update order status",
-					"orderID", orderID,
-					"err", updateErr,
-				)
-			}
-			isFinal := status == "PROCESSED" || status == "INVALID"
-			if isFinal || attempt >= maxAttempts {
-				return
-			}
 		case <-tout:
 			w.logger.Info("timeout")
 			return
@@ -104,42 +105,30 @@ func (w *Worker) pollOrderUntilFinal(ctx context.Context, orderID string) {
 	}
 }
 
-func (w *Worker) fetchAccrualFromExternal(orderID string) (string, float64, error) {
+func (w *Worker) fetchAccrualFromExternal(ctx context.Context, orderID string) (string, float64, error) {
+	var response model.AccrualResponse
 	url := fmt.Sprintf("%s/api/orders/%s", w.config.SystemAddress, orderID)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
-	defer cancel()
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return "", 0, err
 	}
-	req.Header.Set("Accept", "application/json")
-
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", 0, err
 	}
 	defer resp.Body.Close()
 
-	switch resp.StatusCode {
-	case http.StatusOK:
-		var accrualResp model.AccrualResponse
-		if err := json.NewDecoder(resp.Body).Decode(&accrualResp); err != nil {
-			return "", 0, err
-		}
-		return accrualResp.Status, accrualResp.Accrual, nil
-
-	case http.StatusNoContent:
-		return "NOT_FOUND", 0, nil
-
-	case http.StatusTooManyRequests:
-		return "", 0, errs.ErrTooManyRequests
-
-	default:
-		return "", 0, fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("read response error:", err)
 	}
+
+	err = json.Unmarshal(body, &response)
+	if err != nil {
+		fmt.Println("read response error:", err)
+	}
+	return response.Status, response.Accrual, nil
 }
 
 func (w *Worker) Stop() {
