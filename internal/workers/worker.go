@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -112,14 +111,9 @@ func (w *Worker) fetchAccrualFromExternal(ctx context.Context, orderID string) (
 		return "", 0, err
 	}
 	defer resp.Body.Close()
-	
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", 0, err
-	}
 
-	if err := json.Unmarshal(body, &response); err != nil {
-		return "", 0, fmt.Errorf("failed to unmarshal accrual response: %w", err)
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return "", 0, fmt.Errorf("failed to decode accrual response: %w", err)
 	}
 	return response.Status, response.Accrual, nil
 }
