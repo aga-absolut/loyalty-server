@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -10,6 +9,7 @@ import (
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
 	"github.com/aga-absolut/LoyaltyProgram/internal/models"
 	"github.com/aga-absolut/LoyaltyProgram/internal/models/errs"
+	"github.com/aga-absolut/LoyaltyProgram/internal/repository"
 	"github.com/aga-absolut/LoyaltyProgram/internal/tools"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/auth"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
@@ -18,28 +18,17 @@ import (
 type App struct {
 	config      *config.Config
 	logger      *logger.Logger
-	storage     Storage
+	storage     repository.Storage
 	processChan chan string
 }
 
-func NewApp(config *config.Config, logger *logger.Logger, storage Storage, processChan chan string) *App {
+func NewApp(config *config.Config, logger *logger.Logger, storage repository.Storage, processChan chan string) *App {
 	return &App{
 		config:      config,
 		logger:      logger,
 		storage:     storage,
 		processChan: processChan,
 	}
-}
-
-type Storage interface {
-	Withdraw(ctx context.Context, userID int, withdrawnRequest models.WithdrawRequest) error
-	UpdateOrderStatus(ctx context.Context, orderID, status string, accrual float64) error
-	Withdrawals(ctx context.Context, userID int) ([]models.WithdrawResponse, error)
-	UserAuthentication(ctx context.Context, login, password string) (int, error)
-	UserRegistration(ctx context.Context, login, password string) (int, error)
-	GetListOrders(ctx context.Context, userID int) ([]models.ListOrders, error)
-	GetBalance(ctx context.Context, userID int) (models.Balance, error)
-	AddOrderID(ctx context.Context, userID int, number string) error
 }
 
 func (a *App) RegisterHandler(w http.ResponseWriter, r *http.Request) {

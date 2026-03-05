@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/aga-absolut/LoyaltyProgram/internal/app"
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
 	"github.com/aga-absolut/LoyaltyProgram/internal/models"
 	"github.com/aga-absolut/LoyaltyProgram/internal/models/errs"
+	"github.com/aga-absolut/LoyaltyProgram/internal/repository"
 	"github.com/aga-absolut/LoyaltyProgram/internal/tools"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
 	"github.com/jackc/pgerrcode"
@@ -38,7 +38,7 @@ func NewDatabase(config *config.Config, logger *logger.Logger) *Database {
 	}
 }
 
-func NewStorage(config *config.Config, logger *logger.Logger) app.Storage {
+func NewStorage(config *config.Config, logger *logger.Logger) repository.Storage {
 	logger.Infow("connect to Postgres")
 	return NewDatabase(config, logger)
 }
