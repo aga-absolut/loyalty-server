@@ -14,6 +14,7 @@ import (
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose"
 )
@@ -21,12 +22,18 @@ import (
 type Database struct {
 	config *config.Config
 	logger *logger.Logger
-	db     *sql.DB
+	db     *pgxpool.Pool
 }
 
 func NewDatabase(config *config.Config, logger *logger.Logger) *Database {
-	db, err := sql.Open("pgx", config.DatabaseDSN)
+	db, err := pgxpool.New(context.Background(), config.DatabaseDSN)
 	if err != nil {
+		logger.Fatalw("error to connect to db", "error", err)
+		return nil
+	}
+
+	if err := db.Ping(context.Background()); err != nil{
+		logger.Fatalw("error to ping to db", "error", err)
 		return nil
 	}
 
@@ -44,7 +51,7 @@ func NewStorage(config *config.Config, logger *logger.Logger) app.Storage {
 
 func (d *Database) UserRegistration(ctx context.Context, login, hashPassword string) (int, error) {
 	var userID int
-	err := d.db.QueryRowContext(ctx, `INSERT INTO users (user_login, user_password) 
+	err := d.db.QueryRow(ctx, `INSERT INTO users (user_login, user_password) 
 	VALUES ($1, $2) RETURNING id`, login, hashPassword).Scan(&userID)
 	if err != nil {
 		var Pgerr *pgconn.PgError
@@ -58,7 +65,7 @@ func (d *Database) UserRegistration(ctx context.Context, login, hashPassword str
 
 func (d *Database) UserAuthentication(ctx context.Context, login, hashPassword string) (int, error) {
 	var userID int
-	row := d.db.QueryRowContext(ctx, `SELECT id FROM users 
+	row := d.db.QueryRow(ctx, `SELECT id FROM users 
 	WHERE user_login = $1 AND user_password = $2`, login, hashPassword)
 	if err := row.Scan(&userID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -71,13 +78,13 @@ func (d *Database) UserAuthentication(ctx context.Context, login, hashPassword s
 
 func (d *Database) AddOrderID(ctx context.Context, userID int, orderID string) error {
 	var checkUserID int
-	tx, err := d.db.Begin()
+	tx, err := d.db.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer tx.Rollback(ctx)
 
-	err = tx.QueryRowContext(ctx, `SELECT user_id FROM orders WHERE order_id = $1`, orderID).Scan(&checkUserID)
+	err = tx.QueryRow(ctx, `SELECT user_id FROM orders WHERE order_id = $1`, orderID).Scan(&checkUserID)
 	if err == nil {
 		if checkUserID == userID {
 			return errs.ErrOrderIDUsed
@@ -89,7 +96,7 @@ func (d *Database) AddOrderID(ctx context.Context, userID int, orderID string) e
 		}
 	}
 
-	_, err = tx.ExecContext(ctx, `INSERT INTO orders (user_id, order_id, order_status) 
+	_, err = tx.Exec(ctx, `INSERT INTO orders (user_id, order_id, order_status) 
 	VALUES ($1, $2, 'NEW')`, userID, orderID)
 	if err != nil {
 		var Pgerr *pgconn.PgError
@@ -99,14 +106,14 @@ func (d *Database) AddOrderID(ctx context.Context, userID int, orderID string) e
 		return err
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (d *Database) GetListOrders(ctx context.Context, userID int) ([]models.ListOrders, error) {
-	rows, err := d.db.QueryContext(ctx, `SELECT order_id, order_status, accrual, uploaded_at FROM orders
+	rows, err := d.db.Query(ctx, `SELECT order_id, order_status, accrual, uploaded_at FROM orders
 	WHERE user_id = $1 ORDER BY uploaded_at DESC`, userID)
 	if err != nil {
 		return nil, err
@@ -131,7 +138,7 @@ func (d *Database) GetListOrders(ctx context.Context, userID int) ([]models.List
 
 func (d *Database) GetBalance(ctx context.Context, userID int) (models.Balance, error) {
 	balance := models.Balance{}
-	err := d.db.QueryRowContext(ctx, `SELECT user_balance, total_withdrawn FROM users
+	err := d.db.QueryRow(ctx, `SELECT user_balance, total_withdrawn FROM users
 	WHERE id = $1`, userID).Scan(&balance.Current, &balance.WithDrawn)
 	if err != nil {
 		return balance, err
@@ -141,13 +148,13 @@ func (d *Database) GetBalance(ctx context.Context, userID int) (models.Balance, 
 
 func (d *Database) Withdraw(ctx context.Context, userID int, withdrawnRequest models.WithdrawRequest) error {
 	var balance float64
-	tx, err := d.db.Begin()
+	tx, err := d.db.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer tx.Rollback(ctx)
 
-	err = tx.QueryRowContext(ctx, `SELECT user_balance FROM users 
+	err = tx.QueryRow(ctx, `SELECT user_balance FROM users 
 	WHERE id = $1`, userID).Scan(&balance)
 	if err != nil {
 		return err
@@ -157,26 +164,26 @@ func (d *Database) Withdraw(ctx context.Context, userID int, withdrawnRequest mo
 		return errs.ErrNotEnoughMoney
 	}
 
-	_, err = tx.ExecContext(ctx, `UPDATE users SET user_balance = user_balance - $1,total_withdrawn = total_withdrawn + $1 
+	_, err = tx.Exec(ctx, `UPDATE users SET user_balance = user_balance - $1,total_withdrawn = total_withdrawn + $1 
     WHERE id = $2`, withdrawnRequest.Sum, userID)
 	if err != nil {
 		return err
 	}
 
-	_, err = tx.ExecContext(ctx, `INSERT INTO withdrawals (user_id, order_id, amount, processed_at) 
+	_, err = tx.Exec(ctx, `INSERT INTO withdrawals (user_id, order_id, amount, processed_at) 
 	VALUES ($1, $2, $3, NOW())`, userID, withdrawnRequest.Order, withdrawnRequest.Sum)
 	if err != nil {
 		return err
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (d *Database) Withdrawals(ctx context.Context, userID int) ([]models.WithdrawResponse, error) {
-	rows, err := d.db.QueryContext(ctx, `SELECT order_id, amount, processed_at FROM withdrawals 
+	rows, err := d.db.Query(ctx, `SELECT order_id, amount, processed_at FROM withdrawals 
 	WHERE user_id = $1 ORDER BY processed_at DESC`, userID)
 	if err != nil {
 		return nil, err
@@ -198,35 +205,36 @@ func (d *Database) Withdrawals(ctx context.Context, userID int) ([]models.Withdr
 }
 
 func (d *Database) UpdateOrderStatus(ctx context.Context, orderID, status string, accrual float64) error {
-	tx, err := d.db.Begin()
+	tx, err := d.db.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer tx.Rollback(ctx)
 
 	var userID int
-	err = tx.QueryRowContext(ctx, `SELECT user_id FROM orders WHERE order_id = $1`, orderID).Scan(&userID)
+	err = tx.QueryRow(ctx, `SELECT user_id FROM orders WHERE order_id = $1`, orderID).Scan(&userID)
 	if err != nil {
 		return err
 	}
 
-	_, err = tx.ExecContext(ctx, `UPDATE orders SET order_status = $1, accrual = $2 
+	_, err = tx.Exec(ctx, `UPDATE orders SET order_status = $1, accrual = $2 
 	WHERE order_id = $3`, status, accrual, orderID)
 	if err != nil {
 		return err
 	}
 
 	if status == "PROCESSED" && accrual > 0 {
-		_, err = tx.ExecContext(ctx, `UPDATE users SET user_balance = user_balance + $1 
+		_, err = tx.Exec(ctx, `UPDATE users SET user_balance = user_balance + $1 
 		WHERE id = $2`, accrual, userID)
 		if err != nil {
 			return err
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
+
 	return nil
 }
 
