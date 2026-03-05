@@ -21,12 +21,13 @@ type Config struct {
 
 func NewConfig() *Config {
 	cfg := &Config{}
-	if err := env.Parse(cfg); err != nil {
-		return nil
-	}
 	flag.StringVar(&cfg.RunAddress, "a", "", "address and port")                             // localhost:8080
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "name to connect database")                    // postgres://postgres:absolute_1@localhost:5432/LoyalProgram
 	flag.StringVar(&cfg.SystemAddress, "r", "", "address of the accrual calculation system") // http://localhost:35067
 	flag.Parse()
+	if err := env.Parse(cfg); err != nil {
+		return nil
+	}
+	
 	return cfg
 }
