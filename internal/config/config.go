@@ -10,22 +10,23 @@ import (
 var (
 	TokenExpTime = 10 * time.Minute
 	SecretKey    = []byte("absolute_secret_key")
-	SizeWorkers  = 10
+	SizeWorkers  = 1
 )
 
 type Config struct {
 	RunAddress    string `env:"RUN_ADDRESS"`
-	DatabaseURI   string `env:"DATABASE_URI"`
+	DatabaseDSN   string `env:"DATABASE_URI"`
 	SystemAddress string `env:"ACCRUAL_SYSTEM_ADDRESS"`
 }
 
 func NewConfig() *Config {
 	cfg := &Config{}
-	flag.StringVar(&cfg.RunAddress, "a", "localhost:8080", "address and port")
-	flag.StringVar(&cfg.DatabaseURI, "d", "postgres://postgres:absolute_1@localhost:5432/LoyalProgram", "name to connect database")
-	flag.StringVar(&cfg.SystemAddress, "r", "http://localhost:35067", "")
 	if err := env.Parse(cfg); err != nil {
 		return nil
 	}
+	flag.StringVar(&cfg.RunAddress, "a", "", "address and port")                             // localhost:8080
+	flag.StringVar(&cfg.DatabaseDSN, "d", "", "name to connect database")                    // postgres://postgres:absolute_1@localhost:5432/LoyalProgram
+	flag.StringVar(&cfg.SystemAddress, "r", "", "address of the accrual calculation system") // http://localhost:35067
+	flag.Parse()
 	return cfg
 }

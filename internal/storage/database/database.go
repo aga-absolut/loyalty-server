@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/aga-absolut/LoyaltyProgram/internal/app"
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
 	"github.com/aga-absolut/LoyaltyProgram/internal/models"
 	"github.com/aga-absolut/LoyaltyProgram/internal/models/errs"
-	"github.com/aga-absolut/LoyaltyProgram/internal/repository"
 	"github.com/aga-absolut/LoyaltyProgram/internal/tools"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
 	"github.com/jackc/pgerrcode"
@@ -26,7 +26,7 @@ type Database struct {
 }
 
 func NewDatabase(config *config.Config, logger *logger.Logger) *Database {
-	db, err := sql.Open("pgx", config.DatabaseURI)
+	db, err := sql.Open("pgx", config.DatabaseDSN)
 	if err != nil {
 		return nil
 	}
@@ -38,7 +38,7 @@ func NewDatabase(config *config.Config, logger *logger.Logger) *Database {
 	}
 }
 
-func NewStorage(config *config.Config, logger *logger.Logger) repository.Storage {
+func NewStorage(config *config.Config, logger *logger.Logger) app.Storage {
 	logger.Infow("connect to Postgres")
 	return NewDatabase(config, logger)
 }
@@ -236,9 +236,9 @@ func (d *Database) UpdateOrderStatus(ctx context.Context, orderID, status string
 }
 
 func InitMigrations(config *config.Config, logger *logger.Logger) error {
-	logger.Infow("Starting migrations", "database", config.DatabaseURI)
+	logger.Infow("Starting migrations", "database", config.DatabaseDSN)
 
-	db, err := sql.Open("pgx", config.DatabaseURI)
+	db, err := sql.Open("pgx", config.DatabaseDSN)
 	if err != nil {
 		return err
 	}
