@@ -11,15 +11,20 @@ import (
 func NewRouter(app *app.App) *chi.Mux {
 	router := chi.NewRouter()
 	router.Use(logger.WithLogging)
-	router.With(compress.Decompress).Post("/api/user/register", app.RegisterHandler)
-	router.With(compress.Decompress).Post("/api/user/login", app.AuthHandler)
-	router.Group(func(r chi.Router) {
-		r.Use(auth.AuthMiddleware)
-		r.With(compress.Decompress).Post("/api/user/orders", app.AddOrderIDHandler)
-		r.With(compress.Compress).Get("/api/user/orders", app.GetListOrdersHandler)
-		r.With(compress.Compress).Get("/api/user/balance", app.GetBalanceHandler)
-		r.With(compress.Decompress).Post("/api/user/balance/withdraw", app.WithdrawHandler)
-		r.With(compress.Compress).Get("/api/user/withdrawals", app.GetWithdrawalsHandler)
+	router.Route("/api/user", func(r chi.Router) {
+
+		r.With(compress.Decompress).Post("/register", app.RegisterHandler)
+		r.With(compress.Decompress).Post("/login", app.AuthHandler)
+
+		r.Group(func(r chi.Router) {
+			r.Use(auth.AuthMiddleware)
+
+			r.With(compress.Decompress).Post("/orders", app.AddOrderIDHandler)
+			r.With(compress.Compress).Get("/orders", app.GetListOrdersHandler)
+			r.With(compress.Compress).Get("/balance", app.GetBalanceHandler)
+			r.With(compress.Decompress).Post("/balance/withdraw", app.WithdrawHandler)
+			r.With(compress.Compress).Get("/withdrawals", app.GetWithdrawalsHandler)
+		})
 	})
 	return router
 }
