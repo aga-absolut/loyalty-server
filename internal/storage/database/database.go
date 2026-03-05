@@ -224,7 +224,10 @@ func (d *Database) UpdateOrderStatus(ctx context.Context, orderID, status string
 		}
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func InitMigrations(config *config.Config, logger *logger.Logger) error {
