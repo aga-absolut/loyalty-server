@@ -235,18 +235,6 @@ func (d *Database) UpdateOrderStatus(ctx context.Context, orderID, status string
 	return tx.Commit()
 }
 
-// addition
-func (d *Database) AddAccrual(ctx context.Context, userID int, sum float64) error {
-	_, err := d.db.ExecContext(ctx, `UPDATE users SET user_balance = user_balance + $1 WHERE id = $2`, sum, userID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return errs.ErrNoUserID
-		}
-		return err
-	}
-	return nil
-}
-
 func InitMigrations(config *config.Config, logger *logger.Logger) error {
 	logger.Infow("Starting migrations", "database", config.DatabaseURI)
 

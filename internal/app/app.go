@@ -32,7 +32,7 @@ func NewApp(config *config.Config, logger *logger.Logger, storage repository.Sto
 }
 
 func (a *App) RegisterHandler(w http.ResponseWriter, r *http.Request) {
-	credential := models.Credentials{}
+	var credential models.Credentials
 	if err := json.NewDecoder(r.Body).Decode(&credential); err != nil {
 		http.Error(w, "error in decoding the request body", http.StatusBadRequest)
 		return
@@ -50,13 +50,15 @@ func (a *App) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
-		http.Error(w, "error in user registration", http.StatusInternalServerError)
+		a.logger.Errorw("error in user registration", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	token, err := auth.BuildJWTString(userID)
 	if err != nil {
-		http.Error(w, "error to create JWT", http.StatusInternalServerError)
+		a.logger.Errorw("error to create JWT", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	cookie := auth.BuildCookie(token)
@@ -66,14 +68,14 @@ func (a *App) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) AuthHandler(w http.ResponseWriter, r *http.Request) {
-	credential := models.Credentials{}
+	var credential models.Credentials
 	if err := json.NewDecoder(r.Body).Decode(&credential); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	if credential.Login == "" || credential.Password == "" {
-		http.Error(w, "login or password is empty", http.StatusConflict)
+		http.Error(w, "login or password is empty", http.StatusBadRequest)
 		return
 	}
 
@@ -84,13 +86,15 @@ func (a *App) AuthHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
-		http.Error(w, "error in user authentication", http.StatusInternalServerError)
+		a.logger.Errorw("error in user authentication", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	token, err := auth.BuildJWTString(userID)
 	if err != nil {
-		http.Error(w, "error to create JWT", http.StatusInternalServerError)
+		a.logger.Errorw("error to create JWT", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	cookie := auth.BuildCookie(token)
@@ -99,19 +103,20 @@ func (a *App) AuthHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) AddOrderIDHandler(w http.ResponseWriter, r *http.Request) {
-	data, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	orderID := string(data)
-
 	userID, err := auth.GetUserIDFromContext(r.Context())
 	if errors.Is(err, errs.ErrNoUserID) {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	orderID := string(data)
 	err = a.storage.AddOrderID(r.Context(), userID, orderID)
 	if err != nil {
 		switch {
@@ -122,7 +127,8 @@ func (a *App) AddOrderIDHandler(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, errs.ErrOrderIDUsedByAnother):
 			http.Error(w, err.Error(), http.StatusConflict)
 		default:
-			http.Error(w, "internal server error", http.StatusInternalServerError)
+			a.logger.Errorw("internal server error", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
 		}
 		return
 	}
@@ -140,7 +146,8 @@ func (a *App) GetListOrdersHandler(w http.ResponseWriter, r *http.Request) {
 
 	data, err := a.storage.GetListOrders(r.Context(), userID)
 	if err != nil {
-		http.Error(w, "error to get list orders", http.StatusInternalServerError)
+		a.logger.Errorw("error to get list orders", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -152,7 +159,8 @@ func (a *App) GetListOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		a.logger.Errorw("failed encode data", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 
@@ -165,19 +173,21 @@ func (a *App) GetBalanceHandler(w http.ResponseWriter, r *http.Request) {
 
 	data, err := a.storage.GetBalance(r.Context(), userID)
 	if err != nil {
-		http.Error(w, "error to get balance", http.StatusInternalServerError)
+		a.logger.Errorw("error to get balance", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		a.logger.Errorw("failed encode data", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 
 func (a *App) WithdrawHandler(w http.ResponseWriter, r *http.Request) {
-	withdrawRequest := models.WithdrawRequest{}
+	var withdrawRequest models.WithdrawRequest
 	userID, err := auth.GetUserIDFromContext(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
@@ -203,14 +213,15 @@ func (a *App) WithdrawHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		a.logger.Errorw("error to withdraw", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 }
 
-func (a *App) GetWithdraawalsHandler(w http.ResponseWriter, r *http.Request) {
+func (a *App) GetWithdrawalsHandler(w http.ResponseWriter, r *http.Request) {
 	userID, err := auth.GetUserIDFromContext(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
@@ -219,7 +230,8 @@ func (a *App) GetWithdraawalsHandler(w http.ResponseWriter, r *http.Request) {
 
 	data, err := a.storage.Withdrawals(r.Context(), userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		a.logger.Errorw("failed get withdrawls", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -231,33 +243,7 @@ func (a *App) GetWithdraawalsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		a.logger.Errorw("failed encode data", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
 	}
-}
-
-// addition
-func (a *App) AddAccrualHandler(w http.ResponseWriter, r *http.Request) {
-	sum := models.Sum{}
-	userID, err := auth.GetUserIDFromContext(r.Context())
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&sum); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if sum.Sum <= 0 {
-		http.Error(w, "invalid request", http.StatusBadRequest)
-		return
-	}
-
-	if err := a.storage.AddAccrual(r.Context(), userID, sum.Sum); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
 }

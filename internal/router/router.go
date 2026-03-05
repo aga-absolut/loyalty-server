@@ -19,8 +19,7 @@ func NewRouter(app *app.App) *chi.Mux {
 		r.With(compress.Compress).Get("/api/user/orders", app.GetListOrdersHandler)
 		r.With(compress.Compress).Get("/api/user/balance", app.GetBalanceHandler)
 		r.With(compress.Decompress).Post("/api/user/balance/withdraw", app.WithdrawHandler)
-		r.With(compress.Compress).Get("/api/user/withdrawals", app.GetWithdraawalsHandler)
-		r.With(compress.Decompress).Post("/api/user/accrual", app.AddAccrualHandler)
+		r.With(compress.Compress).Get("/api/user/withdrawals", app.GetWithdrawalsHandler)
 	})
 	return router
 }

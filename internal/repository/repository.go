@@ -15,5 +15,4 @@ type Storage interface {
 	GetListOrders(ctx context.Context, userID int) ([]models.ListOrders, error)
 	GetBalance(ctx context.Context, userID int) (models.Balance, error)
 	AddOrderID(ctx context.Context, userID int, number string) error
-	AddAccrual(ctx context.Context, userID int, sum float64) error
 }
