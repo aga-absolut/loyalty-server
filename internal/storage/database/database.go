@@ -11,7 +11,6 @@ import (
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
 	"github.com/aga-absolut/LoyaltyProgram/internal/models"
 	"github.com/aga-absolut/LoyaltyProgram/internal/models/errs"
-	"github.com/aga-absolut/LoyaltyProgram/internal/tools"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -142,10 +141,6 @@ func (d *Database) GetBalance(ctx context.Context, userID int) (models.Balance, 
 
 func (d *Database) Withdraw(ctx context.Context, userID int, withdrawnRequest models.WithdrawRequest) error {
 	var balance float64
-	if ok := tools.CheckOrderID(withdrawnRequest.Order); !ok {
-		return errs.ErrInvalidOrderID
-	}
-
 	tx, err := d.db.Begin()
 	if err != nil {
 		return err

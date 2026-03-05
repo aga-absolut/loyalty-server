@@ -130,6 +130,7 @@ func (a *App) AddOrderIDHandler(w http.ResponseWriter, r *http.Request) {
 	orderID := string(data)
 	if ok := tools.CheckOrderID(orderID); !ok {
 		http.Error(w, errs.ErrInvalidOrderID.Error(), http.StatusUnprocessableEntity)
+		return
 	}
 
 	err = a.storage.AddOrderID(r.Context(), userID, orderID)
@@ -217,13 +218,14 @@ func (a *App) WithdrawHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if ok := tools.CheckOrderID(withdrawRequest.Order); !ok {
+		http.Error(w, errs.ErrInvalidOrderID.Error(), http.StatusPaymentRequired)
+		return
+	}
+
 	if err := a.storage.Withdraw(r.Context(), userID, withdrawRequest); err != nil {
 		if errors.Is(err, errs.ErrNotEnoughMoney) {
 			http.Error(w, err.Error(), http.StatusPaymentRequired)
-			return
-		}
-		if errors.Is(err, errs.ErrInvalidOrderID) {
-			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 			return
 		}
 		a.logger.Errorw("error to withdraw", "error", err)
