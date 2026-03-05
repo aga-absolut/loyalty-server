@@ -72,9 +72,6 @@ func (d *Database) UserAuthentication(ctx context.Context, login, hashPassword s
 
 func (d *Database) AddOrderID(ctx context.Context, userID int, orderID string) error {
 	var checkUserID int
-	if ok := tools.CheckOrderID(orderID); !ok {
-		return errs.ErrInvalidOrderID
-	}
 	tx, err := d.db.Begin()
 	if err != nil {
 		return err

@@ -128,11 +128,13 @@ func (a *App) AddOrderIDHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	orderID := string(data)
+	if ok := tools.CheckOrderID(orderID); !ok {
+		http.Error(w, errs.ErrInvalidOrderID.Error(), http.StatusUnprocessableEntity)
+	}
+
 	err = a.storage.AddOrderID(r.Context(), userID, orderID)
 	if err != nil {
 		switch {
-		case errors.Is(err, errs.ErrInvalidOrderID):
-			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		case errors.Is(err, errs.ErrOrderIDUsed):
 			w.WriteHeader(http.StatusOK)
 		case errors.Is(err, errs.ErrOrderIDUsedByAnother):
