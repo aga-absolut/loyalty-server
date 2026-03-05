@@ -8,22 +8,22 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aga-absolut/LoyaltyProgram/internal/app"
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
 	"github.com/aga-absolut/LoyaltyProgram/internal/models"
-	"github.com/aga-absolut/LoyaltyProgram/internal/repository"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
 )
 
 type Worker struct {
 	processChan chan string
-	storage     repository.Storage
+	storage     app.Storage
 	config      *config.Config
 	logger      *logger.Logger
 	wg          sync.WaitGroup
 	size        int
 }
 
-func NewPollWorker(ctx context.Context, processChan chan string, storage repository.Storage, size int, logger *logger.Logger, config *config.Config) *Worker {
+func NewPollWorker(ctx context.Context, processChan chan string, storage app.Storage, size int, logger *logger.Logger, config *config.Config) *Worker {
 	w := &Worker{
 		processChan: processChan,
 		storage:     storage,
