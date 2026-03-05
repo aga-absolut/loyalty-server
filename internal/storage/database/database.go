@@ -43,9 +43,8 @@ func NewStorage(config *config.Config, logger *logger.Logger) repository.Storage
 	return NewDatabase(config, logger)
 }
 
-func (d *Database) UserRegistration(ctx context.Context, login, password string) (int, error) {
+func (d *Database) UserRegistration(ctx context.Context, login, hashPassword string) (int, error) {
 	var userID int
-	hashPassword := tools.HashSha256(password)
 	err := d.db.QueryRowContext(ctx, `INSERT INTO users (user_login, user_password) 
 	VALUES ($1, $2) RETURNING id`, login, hashPassword).Scan(&userID)
 	if err != nil {
@@ -58,9 +57,8 @@ func (d *Database) UserRegistration(ctx context.Context, login, password string)
 	return userID, nil
 }
 
-func (d *Database) UserAuthentication(ctx context.Context, login, password string) (int, error) {
+func (d *Database) UserAuthentication(ctx context.Context, login, hashPassword string) (int, error) {
 	var userID int
-	hashPassword := tools.HashSha256(password)
 	row := d.db.QueryRowContext(ctx, `SELECT id FROM users 
 	WHERE user_login = $1 AND user_password = $2`, login, hashPassword)
 	if err := row.Scan(&userID); err != nil {

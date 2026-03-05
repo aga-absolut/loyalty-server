@@ -10,6 +10,7 @@ import (
 	"github.com/aga-absolut/LoyaltyProgram/internal/models"
 	"github.com/aga-absolut/LoyaltyProgram/internal/models/errs"
 	"github.com/aga-absolut/LoyaltyProgram/internal/repository"
+	"github.com/aga-absolut/LoyaltyProgram/internal/tools"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/auth"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
 )
@@ -42,7 +43,8 @@ func (a *App) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := a.storage.UserRegistration(r.Context(), credential.Login, credential.Password)
+	hashPassword := tools.HashSha256(credential.Password)
+	userID, err := a.storage.UserRegistration(r.Context(), credential.Login, hashPassword)
 	if err != nil {
 		if errors.Is(err, errs.ErrLoginAlreadyUsed) {
 			http.Error(w, err.Error(), http.StatusConflict)
@@ -75,7 +77,8 @@ func (a *App) AuthHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := a.storage.UserAuthentication(r.Context(), credential.Login, credential.Password)
+	hashPassword := tools.HashSha256(credential.Password)
+	userID, err := a.storage.UserAuthentication(r.Context(), credential.Login, hashPassword)
 	if err != nil {
 		if errors.Is(err, errs.ErrIncorrectLogin) {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
