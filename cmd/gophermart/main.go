@@ -11,7 +11,6 @@ import (
 	"github.com/aga-absolut/LoyaltyProgram/internal/app"
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
 	"github.com/aga-absolut/LoyaltyProgram/internal/router"
-	"github.com/aga-absolut/LoyaltyProgram/internal/storage"
 	"github.com/aga-absolut/LoyaltyProgram/internal/storage/database"
 	"github.com/aga-absolut/LoyaltyProgram/internal/workers"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
@@ -22,10 +21,10 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	processChan := make(chan string, 100)
+	processChan := make(chan string, 10)
 	cfg := config.NewConfig()
 	logger := logger.NewLogger()
-	storage := storage.NewStorage(cfg, logger)
+	storage := database.NewStorage(cfg, logger)
 	worker := workers.NewPollWorker(ctx, processChan, storage, config.SizeWorkers, logger, cfg)
 	app := app.NewApp(cfg, logger, storage, processChan)
 	router := router.NewRouter(app)

@@ -8,8 +8,9 @@ import (
 	"runtime"
 
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
-	"github.com/aga-absolut/LoyaltyProgram/internal/errs"
-	"github.com/aga-absolut/LoyaltyProgram/internal/model"
+	"github.com/aga-absolut/LoyaltyProgram/internal/models"
+	"github.com/aga-absolut/LoyaltyProgram/internal/models/errs"
+	"github.com/aga-absolut/LoyaltyProgram/internal/repository"
 	"github.com/aga-absolut/LoyaltyProgram/internal/tools"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
 	"github.com/jackc/pgerrcode"
@@ -35,6 +36,11 @@ func NewDatabase(config *config.Config, logger *logger.Logger) *Database {
 		logger: logger,
 		db:     db,
 	}
+}
+
+func NewStorage(config *config.Config, logger *logger.Logger) repository.Storage {
+	logger.Infow("connect to Postgres")
+	return NewDatabase(config, logger)
 }
 
 func (d *Database) UserRegistration(ctx context.Context, login, password string) (int, error) {
@@ -105,7 +111,7 @@ func (d *Database) AddOrderID(ctx context.Context, userID int, orderID string) e
 	return nil
 }
 
-func (d *Database) GetListOrders(ctx context.Context, userID int) ([]model.ListOrders, error) {
+func (d *Database) GetListOrders(ctx context.Context, userID int) ([]models.ListOrders, error) {
 	rows, err := d.db.QueryContext(ctx, `SELECT order_id, order_status, accrual, uploaded_at FROM orders
 	WHERE user_id = $1 ORDER BY uploaded_at DESC`, userID)
 	if err != nil {
@@ -113,9 +119,9 @@ func (d *Database) GetListOrders(ctx context.Context, userID int) ([]model.ListO
 	}
 	defer rows.Close()
 
-	orders := make([]model.ListOrders, 0)
+	orders := make([]models.ListOrders, 0)
 	for rows.Next() {
-		order := model.ListOrders{}
+		order := models.ListOrders{}
 		err := rows.Scan(&order.Number, &order.Status, &order.Accrual, &order.UploadedAt)
 		if err != nil {
 			return nil, err
@@ -129,8 +135,8 @@ func (d *Database) GetListOrders(ctx context.Context, userID int) ([]model.ListO
 	return orders, nil
 }
 
-func (d *Database) GetBalance(ctx context.Context, userID int) (model.Balance, error) {
-	balance := model.Balance{}
+func (d *Database) GetBalance(ctx context.Context, userID int) (models.Balance, error) {
+	balance := models.Balance{}
 	err := d.db.QueryRowContext(ctx, `SELECT user_balance, total_withdrawn FROM users
 	WHERE id = $1`, userID).Scan(&balance.Current, &balance.WithDrawn)
 	if err != nil {
@@ -139,7 +145,7 @@ func (d *Database) GetBalance(ctx context.Context, userID int) (model.Balance, e
 	return balance, nil
 }
 
-func (d *Database) Withdraw(ctx context.Context, userID int, withdrawnRequest model.WithdrawRequest) error {
+func (d *Database) Withdraw(ctx context.Context, userID int, withdrawnRequest models.WithdrawRequest) error {
 	var balance float64
 	if ok := tools.CheckOrderID(withdrawnRequest.Order); !ok {
 		return errs.ErrInvalidOrderID
@@ -179,16 +185,16 @@ func (d *Database) Withdraw(ctx context.Context, userID int, withdrawnRequest mo
 	return nil
 }
 
-func (d *Database) Withdrawals(ctx context.Context, userID int) ([]model.WithdrawResponse, error) {
+func (d *Database) Withdrawals(ctx context.Context, userID int) ([]models.WithdrawResponse, error) {
 	rows, err := d.db.QueryContext(ctx, `SELECT order_id, amount, processed_at FROM withdrawals 
 	WHERE user_id = $1 ORDER BY processed_at DESC`, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	withdrawals := make([]model.WithdrawResponse, 0)
+	withdrawals := make([]models.WithdrawResponse, 0)
 	for rows.Next() {
-		withdrawal := model.WithdrawResponse{}
+		withdrawal := models.WithdrawResponse{}
 		if err := rows.Scan(&withdrawal.Order, &withdrawal.Sum, &withdrawal.ProcessedAt); err != nil {
 			return nil, err
 		}

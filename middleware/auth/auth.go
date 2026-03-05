@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
-	"github.com/aga-absolut/LoyaltyProgram/internal/errs"
+	"github.com/aga-absolut/LoyaltyProgram/internal/models/errs"
 	"github.com/golang-jwt/jwt/v5"
 )
 

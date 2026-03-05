@@ -7,8 +7,8 @@ import (
 	"net/http"
 
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
-	"github.com/aga-absolut/LoyaltyProgram/internal/errs"
-	"github.com/aga-absolut/LoyaltyProgram/internal/model"
+	"github.com/aga-absolut/LoyaltyProgram/internal/models"
+	"github.com/aga-absolut/LoyaltyProgram/internal/models/errs"
 	"github.com/aga-absolut/LoyaltyProgram/internal/repository"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/auth"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
@@ -31,7 +31,7 @@ func NewApp(config *config.Config, logger *logger.Logger, storage repository.Sto
 }
 
 func (a *App) RegisterHandler(w http.ResponseWriter, r *http.Request) {
-	credential := model.Credentials{}
+	credential := models.Credentials{}
 	if err := json.NewDecoder(r.Body).Decode(&credential); err != nil {
 		http.Error(w, "error in decoding the request body", http.StatusBadRequest)
 		return
@@ -64,7 +64,7 @@ func (a *App) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) AuthHandler(w http.ResponseWriter, r *http.Request) {
-	credential := model.Credentials{}
+	credential := models.Credentials{}
 	if err := json.NewDecoder(r.Body).Decode(&credential); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -174,7 +174,7 @@ func (a *App) GetBalanceHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) WithdrawHandler(w http.ResponseWriter, r *http.Request) {
-	withdrawRequest := model.WithdrawRequest{}
+	withdrawRequest := models.WithdrawRequest{}
 	userID, err := auth.GetUserIDFromContext(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
@@ -234,7 +234,7 @@ func (a *App) GetWithdraawalsHandler(w http.ResponseWriter, r *http.Request) {
 
 // addition
 func (a *App) AddAccrualHandler(w http.ResponseWriter, r *http.Request) {
-	sum := model.Sum{}
+	sum := models.Sum{}
 	userID, err := auth.GetUserIDFromContext(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)

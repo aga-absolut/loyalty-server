@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
-	"github.com/aga-absolut/LoyaltyProgram/internal/model"
+	"github.com/aga-absolut/LoyaltyProgram/internal/models"
 	"github.com/aga-absolut/LoyaltyProgram/internal/repository"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
 )
@@ -99,7 +99,7 @@ func (w *Worker) pollOrderUntilFinal(ctx context.Context, orderID string) {
 }
 
 func (w *Worker) fetchAccrualFromExternal(ctx context.Context, orderID string) (string, float64, error) {
-	var response model.AccrualResponse
+	var response models.AccrualResponse
 	url := fmt.Sprintf("%s/api/orders/%s", w.config.SystemAddress, orderID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
