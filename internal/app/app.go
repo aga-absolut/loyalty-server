@@ -10,6 +10,7 @@ import (
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
 	"github.com/aga-absolut/LoyaltyProgram/internal/models"
 	"github.com/aga-absolut/LoyaltyProgram/internal/models/errs"
+	"github.com/aga-absolut/LoyaltyProgram/internal/storage/database"
 	"github.com/aga-absolut/LoyaltyProgram/internal/tools"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/auth"
 	"github.com/aga-absolut/LoyaltyProgram/middleware/logger"
@@ -40,6 +41,11 @@ func NewApp(config *config.Config, logger *logger.Logger, storage Storage, proce
 		storage:     storage,
 		processChan: processChan,
 	}
+}
+
+func NewStorage(config *config.Config, logger *logger.Logger) Storage {
+	logger.Infow("connect to Postgres")
+	return database.NewDatabase(config, logger)
 }
 
 func (a *App) RegisterHandler(w http.ResponseWriter, r *http.Request) {

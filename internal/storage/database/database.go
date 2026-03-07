@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/aga-absolut/LoyaltyProgram/internal/app"
 	"github.com/aga-absolut/LoyaltyProgram/internal/config"
 	"github.com/aga-absolut/LoyaltyProgram/internal/models"
 	"github.com/aga-absolut/LoyaltyProgram/internal/models/errs"
@@ -32,7 +31,7 @@ func NewDatabase(config *config.Config, logger *logger.Logger) *Database {
 		return nil
 	}
 
-	if err := db.Ping(context.Background()); err != nil{
+	if err := db.Ping(context.Background()); err != nil {
 		logger.Fatalw("error to ping to db", "error", err)
 		return nil
 	}
@@ -42,11 +41,6 @@ func NewDatabase(config *config.Config, logger *logger.Logger) *Database {
 		logger: logger,
 		db:     db,
 	}
-}
-
-func NewStorage(config *config.Config, logger *logger.Logger) app.Storage {
-	logger.Infow("connect to Postgres")
-	return NewDatabase(config, logger)
 }
 
 func (d *Database) UserRegistration(ctx context.Context, login, hashPassword string) (int, error) {

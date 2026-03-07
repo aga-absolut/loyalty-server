@@ -24,7 +24,7 @@ func main() {
 	processChan := make(chan string, 10)
 	cfg := config.NewConfig()
 	logger := logger.NewLogger()
-	storage := database.NewStorage(cfg, logger)
+	storage := app.NewStorage(cfg, logger)
 	worker := workers.NewPollWorker(ctx, processChan, storage, config.SizeWorkers, logger, cfg)
 	app := app.NewApp(cfg, logger, storage, processChan)
 	router := router.NewRouter(app)
