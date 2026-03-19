@@ -228,7 +228,6 @@ func (d *Database) UpdateOrderStatus(ctx context.Context, orderID, status string
 	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
-
 	return nil
 }
 
